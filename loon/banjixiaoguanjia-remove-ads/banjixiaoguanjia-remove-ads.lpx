@@ -1,0 +1,68 @@
+#!name=班级小管家去广告
+#!desc=去掉「班级小管家」App 的开屏/插屏广告位与自建广告位。需配合可莉「广告平台拦截器」并置于其下方；仅对 App 生效，账号登录、作业、照片/语音等相关域名不做任何拦截。
+#!author=chenpeng
+#!tag=去广告,教育
+#!openUrl=https://apps.apple.com/cn/app/id1524125516
+#!system=iOS
+#!loon_version=3.2.4(787)
+#!homepage=https://github.com/onlycp/plugins
+#!icon=https://raw.githubusercontent.com/onlycp/plugins/main/loon/banjixiaoguanjia-remove-ads/icon.png
+#!date=2026-10-16
+
+# 图标 = 官方 App Store 图标，已随插件放本仓库：loon/banjixiaoguanjia-remove-ads/icon.png
+# 想换自制图标，替换同目录的 icon.png（正方形 PNG，建议 256 或 512）即可，不用改这一行。
+
+############################################################
+# 班级小管家（com.banjixiaoguanjia.app / App Store id 1524125516）
+# 主域：service.banjixiaoguanjia.com（业务网关）
+# 静态资源：allsystemfile.welife001.com（配置 JSON、图片、字体、canvaskit）
+############################################################
+
+[Rule]
+############################################################
+# 一、补漏：官方《第三方 SDK 目录》里列出、但可莉「广告平台拦截器」尚未覆盖的广告 SDK
+############################################################
+# 美数聚合（atdplus.cn 的 CNAME 指向 adx-svr.1rtb.com，是 RTB 广告交易域名）
+DOMAIN-SUFFIX,atdplus.cn,REJECT
+DOMAIN-SUFFIX,admate.cn,REJECT
+# AdScope
+DOMAIN-SUFFIX,ad-scope.com.cn,REJECT
+# 亿帆（主域无解析，子域 www.yfanads.cn 有解析，用 SUFFIX 一并覆盖）
+DOMAIN-SUFFIX,yfanads.cn,REJECT
+# 优推广告平台（同上，youtui./www.gameley.com 有解析）
+DOMAIN-SUFFIX,gameley.com,REJECT
+# 趣盟
+DOMAIN-SUFFIX,qttunion.com,REJECT
+
+# 说明：优量汇(gdt.qq.com / pgdt.qq.com / ugdtimg.com)、穿山甲(*.pangolin* / *.snssdk.com)、
+# Funlink(adfunlink.com)、Octopus(sdk.zhangyuyidong.cn) 已由可莉「广告平台拦截器」覆盖，此处不重复。
+# 若抓包发现新的广告域名，直接追加在上方即可。
+
+[Rewrite]
+############################################################
+# 二、App 自建广告位（静态 JSON，无需登录，已实测可访问）
+#   data: [] 表示不下发任何自建广告位，客户端拿不到 posId 就不会展示
+#   对应：首页插屏(app_ad_home_chapin)、首页 Banner(app_ad_home_banner)、
+#        作业结束页 Banner(app_ad_post_end_banner)
+############################################################
+^https:\/\/allsystemfile\.welife001\.com\/app\/ads\/app_ads_config\.json response-body-json-replace data []
+# 若上面这行在你的 Loon 版本上不生效，可换成等价的 jq 写法（同一时间只保留一行）：
+# ^https:\/\/allsystemfile\.welife001\.com\/app\/ads\/app_ads_config\.json response-body-json-jq '.data=[]'
+
+############################################################
+# 三、兜底：这两个广告开关数组当前为空，但服务端随时可以塞内容
+############################################################
+^https:\/\/allsystemfile\.welife001\.com\/app\/config\/app_config\.json response-body-json-replace data.ads.submit_card_list [] data.ads.app_ad_home_icon []
+
+# 进阶（默认关闭，需要时把行首的 # 去掉）：
+# /app/getAdConfV2 是三方广告（优量汇等）的位配置下发接口，返回体形如 {"code":0,"msg":"","data":{...}}。
+# 它的 data 结构未做抓包验证，客户端还会把结果缓存到本地，所以默认不处理——只靠上面的域名拦截去开屏广告。
+# 如果你抓到了真实的响应 JSON，可以按下面两种方式处理：
+# ^https:\/\/service\.banjixiaoguanjia\.com\/app\/getAdConfV2 response-body-json-replace data {}
+# ^https:\/\/service\.banjixiaoguanjia\.com\/app\/getAdConfV2 mock-response-body data-type=json data-path=bjxgjs_adconf.json status-code=200
+
+[MitM]
+# 只解密静态资源站，用于改写上面两个 JSON。
+# 注意：没有加 service.banjixiaoguanjia.com（业务网关），
+# 以免 App 的登录/作业等接口流量被解密，也避免遇到证书校验时整个 App 不可用。
+hostname=allsystemfile.welife001.com

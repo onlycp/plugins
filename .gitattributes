@@ -1,0 +1,8 @@
+# 统一换行，避免 Windows/编辑器把插件文件改成 CRLF
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary

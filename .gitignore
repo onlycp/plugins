@@ -1,0 +1,101 @@
+# ============================================================
+#  .gitignore  —— 只忽略“过程产物”，成品插件必须入库
+#  成品文件（.lpx / .sgmodule / .plugin / .snippet / .js / .conf / .json / 图片）
+#  一律不要忽略，因为用户是靠 raw 直链下载它们的。
+# ============================================================
+
+# ---------- macOS ----------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+.fseventsd
+.apdisk
+[Tt]humbs.db
+
+# ---------- 编辑器 / IDE ----------
+.vscode/
+!.vscode/settings.json.example
+.idea/
+*.iml
+*.swp
+*.swo
+*~
+\#*\#
+.\#*
+*.code-workspace
+*.sublime-workspace
+*.sublime-project
+
+# ---------- 临时 / 备份 ----------
+*.bak
+*.backup
+*.orig
+*.rej
+*.tmp
+*.temp
+*.log
+*.pid
+*.pid.lock
+tmp/
+temp/
+.cache/
+.serve/
+*.local
+*.local.*
+
+# ---------- 密钥 / 机密 ----------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.mobileprovision
+*.provisionprofile
+secrets/
+credentials/
+*.token
+
+# ---------- 代码类插件（脚本 / 前端）的依赖与构建产物 ----------
+# 说明：如果某个插件的成品就是 build/dist 里的文件，在该插件目录里
+#      再放一个 .gitignore 用 ! 把它捞回来即可。
+node_modules/
+dist/
+build/
+out/
+target/
+coverage/
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# ---------- 本地调试用的抓包 / 逆向原始数据（体积大且有隐私） ----------
+*.har
+*.chls
+*.chlsx
+*.pcap
+*.pcapng
+raw-capture/
+captures/
+private/
+
+# ============================================================
+#  兜底：确保成品插件不会被上面的规则误伤
+# ============================================================
+!*.lpx
+!*.sgmodule
+!*.plugin
+!*.snippet
+!*.stoverride
+!*.list
+!*.conf
+!*.js
+!*.json
+!*.png
+!*.jpg
+!*.svg
