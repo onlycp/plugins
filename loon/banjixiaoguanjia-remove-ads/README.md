@@ -61,42 +61,72 @@ App 是 Flutter 写的，广告分成**两套完全独立的系统**：
 
 | 手段 | 内容 | 是否需要 MitM |
 | --- | --- | --- |
-| `[Rule]` 补漏 | 8 个域名 `DOMAIN-SUFFIX` → `REJECT`：6 个可莉完全没覆盖，2 个是给可莉「逐子域」写法收口 | 否 |
+| `[Rule]` 补漏 | 5 个域名 `DOMAIN-SUFFIX` → `REJECT`，都经过 `tools/kelee-coverage.py` 核对、确认可莉确实没盖 | 否 |
 | `[Rewrite]` | ① 自建广告位 `app_ads_config.json` 的 `data` → `[]`；② 广告图目录 `/app/ads/imgs/` 整段 `reject` 兜底；③ 精确清空 `app_config.json` 里的两个广告开关数组 | 是（仅 `allsystemfile.welife001.com`） |
 | 进阶（默认注释掉） | `/app/getAdConfV2` 的响应改写 / Mock，等抓到真实结构再启用 | 是（要开业务网关，默认坚决不做） |
 
-### 3.1 域名补漏：为什么只补 8 条，而不是抄一份 80 条的规则集
+### 3.1 域名补漏：只补可莉确实没盖的 5 条
 
 规则不是越多越好。可莉的 `BlockAdvertisers` 已经把主流广告 SDK 覆盖得相当全，
 本插件**只补它确实漏的**，免得两个插件在同一批域名上重复堆规则、以后互相打架。
 
-| 域名（本插件加的） | 平台 | 可莉的状态（2026-10-16 直接核对其 `BlockAdvertisers.lpx` 源码） |
+**核对基准：可莉 2026-10-02 版，346 条规则。**
+
+| 域名（本插件加的） | 平台 | 可莉 2026-10-02 版的状态 |
 | --- | --- | --- |
-| `gdt.qq.com` | 优量汇（腾讯广告） | ⚠️ **只逐个子域**列了 `c2.` / `mi.` / `t.gdt.qq.com`，漏了 `win.` / `v.` / `sdk.` → 这里用 `SUFFIX` 一次盖住 |
-| `ugdtimg.com` | 优量汇素材 CDN | ⚠️ 只盖了 `adsmind.` / `pgdt.` 两个子域 → 同样用 `SUFFIX` 收口 |
-| `atdplus.cn` | 美数聚合 | ❌ 完全没有（它 CNAME 到 `adx-svr.1rtb.com`，可莉只墙了上游 `1rtb.com`） |
-| `admate.cn` | 美数聚合 | ❌ 完全没有 |
-| `ad-scope.com.cn` | AdScope（轻变聚合） | ❌ 完全没有 |
-| `yfanads.cn` | 亿帆 | ❌ 完全没有（主域无解析，`www.yfanads.cn` 有） |
-| `gameley.com` | 优推 | ❌ 完全没有（`youtui.gameley.com` 有） |
-| `qttunion.com` | 趣盟 | ❌ 完全没有 |
+| `atdplus.cn` | 美数聚合 | ❌ 没有 —— 她只墙了它的上游 RTB `1rtb.com` / `1rtb.net`，落地域名反而没盖 |
+| `admate.cn` | 美数聚合 | ❌ 没有 |
+| `yfanads.cn` | 亿帆 | ❌ 没有 —— 她写的是 `yfanads.com`，`.cn` 是另一个域名（实测 `www.yfanads.cn` 有解析） |
+| `gameley.com` | 优推 | ❌ 没有 —— 她只墙了 `ad.gameley.com`，而 `youtui.` / `www.gameley.com` 也有解析 |
+| `qttunion.com` | 趣盟 | ❌ 没有 |
+
+**已由可莉覆盖、这里刻意不重复写的**（均为 2026-10-02 版**实测**，不是猜的）：
+
+| 平台 | 可莉用的规则 |
+| --- | --- |
+| 优量汇（腾讯广告） | `DOMAIN-SUFFIX,gdt.qq.com` / `gdtimg.com` / `ugdtimg.com` —— **整域**，不是逐子域 |
+| 穿山甲 | `DOMAIN-KEYWORD,pangolin` / `pglstatp` / `panplayable-toutiao`，`DOMAIN-SUFFIX,pangle.io` |
+| AdScope（轻变聚合） | `DOMAIN-SUFFIX,ad-scope.com.cn` |
+| Funlink | `DOMAIN-SUFFIX,adfunlink.com` |
+| Octopus | `DOMAIN,sdk.zhangyuyidong.cn` / `sdklog.zhangyuyidong.cn` |
+| 美数上游 RTB | `DOMAIN-SUFFIX,1rtb.com` / `1rtb.net` |
+| 优量汇 SDK 配置 | `DOMAIN,sdk.e.qq.com` |
+
+#### 怎么复核这一层依赖（踩过的坑，务必看）
+
+```bash
+python3 tools/kelee-coverage.py -k <可莉BlockAdvertisers副本.lpx>
+```
+
+脚本会打印可莉副本的 `#!date`，并逐条告诉我们「这条她已覆盖/她确实没有」。
+
+> **⚠️ 这个脚本是踩坑之后写的。** 最初复核时我拿到的是 GitHub 上一个备份仓库里的 `.lpx`，
+> 它的 `#!date` 是 **2025-09-16**（落后整整一年）；同时可莉的规则写法是
+> `DOMAIN-SUFFIX, gdt.qq.com, REJECT`——**逗号后面带空格**。两个因素叠加，
+> 我得出「可莉漏了优量汇 `win.` / `v.` / `sdk.gdt.qq.com`」的**错误结论**，
+> 往插件里加了 3 条多余规则（`gdt.qq.com`、`ugdtimg.com`、`ad-scope.com.cn`）并推上了 GitHub。
+> 换成 **2026-10-02** 的副本重新核对才发现，这些她早就整域盖住了，现已删除。
+
+所以以后核对可莉覆盖，记住两条：
+
+1. **先看副本的 `#!date`** —— 第三方备份仓库（KeleeOne、kele、Tool 之类）经常落后好几个月，很容易把它当成"可莉现状"。
+2. **比对前去掉逗号后的空格** —— 她的规则是 `DOMAIN-SUFFIX, xxx, REJECT`，直接拼 `DOMAIN-SUFFIX,xxx` 去匹配会全部漏判。
+
+`tools/kelee-coverage.py` 已经把这两件事都处理了，直接用它就行（它也会在有重复规则时报出来）。
 
 解析结论均用 `dig @223.5.5.5` 实测（本机 DNS 被 fake-ip 接管，只能指定 DNS 查）：
 
 ```
-gdt.qq.com     113.108.27.43      win.gdt.qq.com   123.151.49.178
-v.gdt.qq.com   113.108.81.233     sdk.gdt.qq.com   119.147.12.159
-c2.gdt.qq.com  113.108.81.206     t.gdt.qq.com     113.108.27.27
-www.yfanads.cn 14.103.234.158     youtui.gameley.com 81.70.205.221
+www.yfanads.cn      14.103.234.158
+youtui.gameley.com  81.70.205.221
+gdt.qq.com          113.108.27.43      win.gdt.qq.com  123.151.49.178
+v.gdt.qq.com        113.108.81.233     sdk.gdt.qq.com  119.147.12.159
 ```
 
-**已由可莉覆盖、这里刻意不重复写的**（可莉哪天改版失效了再补）：
-
-- 穿山甲：`pangolin-sdk-toutiao*.com`、`pangolin.snssdk.com`、`panplayable-toutiao*.com`、`pglstatp-toutiao*.com`，外加 `api-access` / `log-api` 关键字规则
-- Funlink `adfunlink.com` · Octopus `sdk.` / `sdklog.zhangyuyidong.cn` · 美数上游 RTB `1rtb.com` / `1rtb.net` · 优量汇 SDK 配置 `sdk.e.qq.com`
+（最后两行是优量汇的子域，**由可莉的整域规则拦掉**，写在这里只是存档，本插件没有再重复加。）
 
 > **两个反例（别照抄网上的大杂烩规则集）**
-> 1. **不要写 `DOMAIN-SUFFIX,snssdk.com,REJECT`** —— 抖音等字节系 App 的业务接口（`aweme.snssdk.com`）就在同一域名下。本插件主要是给班级小管家用的，没必要为它误伤别的 App。
+> 1. **不要写 `DOMAIN-SUFFIX,snssdk.com,REJECT`** —— 抖音等字节系 App 的业务接口（`aweme.snssdk.com`）就在同一域名下。可莉自己的做法是用 `AND` 规则把「字节系 API 域名 + `tnc` 关键字」显式 `DIRECT`，要拦就学她那种做法，别整域墙。
 > 2. **不要碰用户数据 CDN** —— `img|video|record|file|cosimg|disk|album.welife001.com`、`campusfile.welife001.com`、`tos*.banjixiaoguanjia.com` 放的是孩子的照片、语音、作业附件，一条都不能拦。
 
 ### 3.2 广告图兜底
@@ -109,7 +139,7 @@ www.yfanads.cn 14.103.234.158     youtui.gameley.com 81.70.205.221
 
 这个文件里还有 `soe` / `launch` / `record` / `post` / `notification` 等十几项**业务配置**，
 所以规则只精确清空 `data.ads.submit_card_list` 与 `data.ads.app_ad_home_icon` 两个键，
-其余字段一个字节都不动（这条有自动化断言校验，见 `.lpx` 里 `[Rewrite]` 的注释）。
+其余字段一个字节都不动。**这条是硬约束**：写成整包 `data` 替换会把作业、打卡、通知等配置一起打掉。
 
 ### 3.4 MitM 范围：只解密一个静态资源站
 
@@ -168,7 +198,8 @@ https://raw.githubusercontent.com/onlycp/plugins/main/loon/banjixiaoguanjia-remo
 
 ### A. 域名拦截（`[Rule]`，不用 MitM，最容易先看）
 
-1. 冷启动 App，「请求记录」里筛 `gdt.qq.com`、`ugdtimg.com`、`atdplus.cn`、`qttunion.com`，应该看到请求被拒绝、根本没出网。
+1. 冷启动 App，「请求记录」里筛本插件保留的 5 个域名 `atdplus.cn`、`admate.cn`、`yfanads.cn`、`gameley.com`、`qttunion.com`，应该看到请求被拒绝、根本没出网。
+   （可莉自己已覆盖的 `gdt.qq.com` / `ugdtimg.com` 等，筛出来会挂在可莉那条规则上，属正常。）
 2. 看到广告消失即生效。若这些域名仍正常返回 → 多半是本插件排在了可莉**上面**（插件顺序 = 生效顺序，见第四节），或插件没启用。
 
 ### B. 配置改写（依赖 MitM）
@@ -187,7 +218,7 @@ https://raw.githubusercontent.com/onlycp/plugins/main/loon/banjixiaoguanjia-remo
 
 ## 六、验证清单
 
-打开插件后依次确认（任何一项异常就先把 `[Rewrite]` 两行注释掉回滚）：
+打开插件后依次确认（任何一项异常，先把 `[Rewrite]` 段整段注释掉回滚——现在是 3 条改写）：
 
 - [ ] 开屏广告消失，且启动没有多出几秒白屏
 - [ ] 首页顶部/信息流没多出「支付宝」样式的 Banner
@@ -205,7 +236,7 @@ https://raw.githubusercontent.com/onlycp/plugins/main/loon/banjixiaoguanjia-remo
 - MitM 只解密 `allsystemfile.welife001.com` 这一个静态站，且只改写 3 条明确的广告/图片路径；若你还有别的 App 也从这个站取资源，注意 `[Rewrite]` 的路径匹配是否可能误伤（本插件匹配的都是 `/app/ads/` 与 `app_config.json` 的固定路径）。
 - 本地调试用的 HTTP 服务（`tools/serve.py`）对**整个局域网**开放（日志里已经看到 `192.168.3.168` 这类无关设备来敲门），调试完请 `Ctrl+C` 关掉。
 - 插件 `[Rule]` 只能用 `DIRECT` / `REJECT` 系列 / `PROXY` 三种策略。
-- **`[Rule]` 是全设备生效的，不是「只对这个 App」。** 上面 8 个都是纯广告域名（优量汇 / 美数 / 趣盟…），
+- **`[Rule]` 是全设备生效的，不是「只对这个 App」。** 上面 5 个都是纯广告域名（美数 / 亿帆 / 优推 / 趣盟），
   任何 App 都不该访问它们，所以全局 REJECT 是安全的；反过来说，**千万别往里加业务域名**（见 3.1 的两个反例）。
   代价是：它会连带挡住**别的 App 里的优量汇/美数广告**（例如某些游戏的开屏）。对"全局去广告"这是期望行为；
   如果你只想动班级小管家，只能把整域 `SUFFIX` 改回更窄的子域列表，代价是重新出现漏网子域。
@@ -214,7 +245,7 @@ https://raw.githubusercontent.com/onlycp/plugins/main/loon/banjixiaoguanjia-remo
 ## 八、下一步（可选）
 
 1. 抓 `/app/getAdConfV2` 的**真实响应结构**（临时开业务网关 MitM 的做法见 5.C，抓完记得删）。
-2. 拿到结构后启用 `[Rewrite]` 里注释掉的进阶两行（注释里已写好两种写法）。它比单纯墙域名干净：客户端连 `/launch_page` 都不会跳，也不会有白屏风险。
+2. 拿到结构后启用第四节里注释掉的进阶写法（`response-body-json-replace` / `mock-response-body` 两种等价写法任选一行）。它比单纯墙域名干净：客户端连 `/launch_page` 都不会跳，也不会有白屏风险。
 3. 要做同款其它客户端的版本，直接在仓库里新建 `surge/<插件id>/`（`.sgmodule`）、`quantumultx/<插件id>/`（rewrite 片段）即可，域名清单和改写逻辑可以直接复用。
 
 ### 插件 `[Rewrite]` 语法备忘（Loon 旧版语法）
@@ -227,3 +258,44 @@ https://raw.githubusercontent.com/onlycp/plugins/main/loon/banjixiaoguanjia-remo
 
 单行按空格分参数，值里不能有空格（要写空格用 `\x20`）。另外 `reject-dict` 返回的是 `{}`，
 对本 App 的 `{"code":..,"msg":..,"data":..}` 信封格式会解析失败，所以本插件不用它。
+
+---
+
+## 九、能不能收录到可莉的插件中心？
+
+**结论：可以，但没有公开投稿入口，只能联系可莉本人手动收录；而且这个插件并不依赖收录。**
+
+| 事实 | 依据（2026-10-16 实测） |
+| --- | --- |
+| 插件中心 | <https://hub.kelee.one> |
+| 列表数据源 | <https://hub.kelee.one/list.json>（275 条插件） |
+| 275 条插件的下载地址 | **全部**指向 `https://kelee.one/Tool/Loon/Lpx/<名字>.lpx`——即插件托管在她自己的服务器上，**没有一条指向作者自己的 GitHub 仓库** |
+| 投稿说明 | 她的仓库里没有 `CONTRIBUTING` 或投稿章节 |
+| 唯一联系入口 | Telegram 频道 [`@ibilibili`](https://t.me/ibilibili)（「֍可莉日常֎」） |
+| 她的 GitHub | [`luestr`](https://github.com/luestr)（主仓库 `luestr/ProxyResource`） |
+
+清单里没有一个外部地址，说明插件中心是**她一个人维护的托管列表**，不是自助提交的分发索引——
+要收录得她本人点头（她很可能还会自己复核规则、改写成她的写法再放进自己仓库）。
+
+### 想投稿就照这个发
+
+```text
+你好，我想投稿一个 Loon 插件：班级小管家去广告
+https://raw.githubusercontent.com/onlycp/plugins/main/loon/banjixiaoguanjia-remove-ads/banjixiaoguanjia-remove-ads.lpx
+
+定位：你的 BlockAdvertisers 的补充，不是替代，安装时放在它下方。
+[Rule] 只有 5 个域名，都核对过你 2026-10-02 版确实没盖：
+atdplus.cn / admate.cn / yfanads.cn / gameley.com / qttunion.com；
+你已覆盖的 gdt.qq.com、gdtimg.com、ugdtimg.com、ad-scope.com.cn 我都没有重复写。
+主要手段是 [Rewrite]：改的是 App 自建的支付宝广告位静态 JSON（allsystemfile.welife001.com），
+MitM 只开这一个静态资源站，不碰业务网关，也不碰照片/语音/视频 CDN。
+README 里写明了依赖你的插件并置于其下方。
+```
+
+### 两个提醒
+
+- **授权**：她的资源库标注 CC BY-NC-SA 4.0，并要求「非商业、不得在中国境内平台传播」。
+  本插件**没有复制她的任何规则文本**，只是刻意避开重合域名（对照表见 3.1），属于独立作品；
+  但以后若要直接引用她的规则片段，需按其许可署名、以相同方式共享，也不要用于商业售卖或在中国境内平台传播。
+- **收录不是必需**：本插件靠 raw 直链安装与更新（见第四节），收录只是多一个曝光入口；
+  而且收录后每次更新要等她同步，而你自己推 GitHub 后，用一键导入的用户立刻就能更新。

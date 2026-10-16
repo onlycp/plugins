@@ -27,7 +27,8 @@
 │
 └── tools/
     ├── serve.py                  # 局域网调试服务器（带一键导入页）
-    └── new-plugin.sh             # 新增插件脚手架
+    ├── new-plugin.sh             # 新增插件脚手架
+    └── kelee-coverage.py         # 核对 Loon 去广告插件与可莉「广告平台拦截器」的规则覆盖，避免重复堆规则
 ```
 
 **为什么按宿主平铺，而不是按「代理 / 浏览器 / 编辑器」这类功能类别分？**
@@ -81,7 +82,7 @@
 
 | 宿主 | 插件 | 作用 | 一键导入 |
 | --- | --- | --- | --- |
-| Loon | [班级小管家去广告](loon/banjixiaoguanjia-remove-ads/) | 去掉「班级小管家」App 的开屏/插屏/自建广告位，需配合可莉「广告平台拦截器」 | [导入到 Loon](https://www.nsloon.com/openloon/import?plugin=https%3A%2F%2Fraw.githubusercontent.com%2Fonlycp%2Fplugins%2Fmain%2Floon%2Fbanjixiaoguanjia-remove-ads%2Fbanjixiaoguanjia-remove-ads.lpx) |
+| Loon | [班级小管家去广告](loon/banjixiaoguanjia-remove-ads/) | 去掉「班级小管家」App 的开屏/插屏/自建广告位；只补可莉「广告平台拦截器」确实没盖的 5 个域名（已用 `tools/kelee-coverage.py` 核对，无重复规则） | [导入到 Loon](https://www.nsloon.com/openloon/import?plugin=https%3A%2F%2Fraw.githubusercontent.com%2Fonlycp%2Fplugins%2Fmain%2Floon%2Fbanjixiaoguanjia-remove-ads%2Fbanjixiaoguanjia-remove-ads.lpx) |
 
 > 新增插件后请顺手往这张表加一行。
 

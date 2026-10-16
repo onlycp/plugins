@@ -21,47 +21,42 @@
 
 [Rule]
 ############################################################
-# 一、补漏：官方《第三方 SDK 目录》里列出、而可莉「广告平台拦截器」尚未覆盖的域名
-#    只写"可莉确实没盖"的，不重复堆规则——插件列表越长越容易互相打架
-#    解析结论均用 dig @223.5.5.5 实测于 2026-10-16
+# 一、补漏：只补可莉「广告平台拦截器」确实没盖的域名
+#     核对基准：可莉 2026-10-02 版（346 条规则）
+#     ⚠️ 核对注意：可莉的写法是 "DOMAIN-SUFFIX, gdt.qq.com, REJECT"——**逗号后面有空格**，
+#        用脚本比对时务必先 strip，否则会把"已覆盖"误判成"没覆盖"（本插件就踩过这个坑）。
+#     解析结论均用 dig @223.5.5.5 实测于 2026-10-16（本机 DNS 被 fake-ip 接管，必须指定 DNS）
 ############################################################
-# ── 优量汇（腾讯广告 GDT）：开屏广告的位号 103544143 就走这里 ──
-# 可莉是"逐个子域"覆盖（只列了 c2./mi./t.gdt.qq.com 和 sdk.e.qq.com），
-# 而实测 win./v./sdk./c2./mi./t.gdt.qq.com 全都有解析，SUFFIX 一次盖住，堵掉漏网子域：
-#   gdt.qq.com 113.108.27.43 · win.gdt.qq.com 123.151.49.178 · v.gdt.qq.com 113.108.81.233
-#   sdk.gdt.qq.com 119.147.12.159 · c2.gdt.qq.com 113.108.81.206 · t.gdt.qq.com 113.108.27.27
-DOMAIN-SUFFIX,gdt.qq.com,REJECT
-# 优量汇素材 CDN（可莉只盖了 adsmind. / pgdt. 两个子域）
-DOMAIN-SUFFIX,ugdtimg.com,REJECT
 
-# ── 美数聚合（美数科技）──
+# ── 美数聚合：可莉只墙了它的上游 RTB（1rtb.com / 1rtb.net），这两个落地域名没盖 ──
 DOMAIN-SUFFIX,atdplus.cn,REJECT
 DOMAIN-SUFFIX,admate.cn,REJECT
 
-# ── AdScope（轻变聚合）──
-DOMAIN-SUFFIX,ad-scope.com.cn,REJECT
-
-# ── 亿帆（主域无解析，但 www.yfanads.cn 有解析 14.103.234.158，SUFFIX 一并覆盖）──
+# ── 亿帆：可莉只墙了 yfanads.com，.cn 是另一个域名（www.yfanads.cn 实测有解析）──
 DOMAIN-SUFFIX,yfanads.cn,REJECT
 
-# ── 优推（主域无解析，但 youtui./www.gameley.com 有解析 81.70.205.221）──
+# ── 优推：可莉只墙了 ad.gameley.com，而实测 youtui./www.gameley.com 也有解析 ──
 DOMAIN-SUFFIX,gameley.com,REJECT
 
-# ── 趣盟 ──
+# ── 趣盟：可莉完全没有 ──
 DOMAIN-SUFFIX,qttunion.com,REJECT
 
 ############################################################
-# 以下平台已确认被可莉「广告平台拦截器」覆盖，此处不重复（改版时可莉若变更再补）：
-#   穿山甲：pangolin-sdk-toutiao*.com / pangolin.snssdk.com / panplayable-toutiao*.com /
-#           pglstatp-toutiao*.com，外加 api-access、log-api 关键字规则
-#   Funlink：adfunlink.com　　Octopus：sdk./sdklog.zhangyuyidong.cn
-#   美数聚合上游 RTB：1rtb.com / 1rtb.net　　优量汇 SDK 配置：sdk.e.qq.com
+# 以下平台已确认被可莉 2026-10-02 版覆盖，此处**刻意不重复**：
+#   优量汇：DOMAIN-SUFFIX,gdt.qq.com / gdtimg.com / ugdtimg.com —— 是整域，不是逐子域
+#   穿山甲：DOMAIN-KEYWORD,pangolin / pglstatp / panplayable-toutiao，DOMAIN-SUFFIX,pangle.io
+#   AdScope：DOMAIN-SUFFIX,ad-scope.com.cn　　　Funlink：DOMAIN-SUFFIX,adfunlink.com
+#   Octopus：DOMAIN,sdk. / sdklog.zhangyuyidong.cn　　优量汇 SDK 配置：DOMAIN,sdk.e.qq.com
+#   美数上游 RTB：DOMAIN-SUFFIX,1rtb.com / 1rtb.net
 #
-# 反例提醒（别照抄网上的规则）：不要写 DOMAIN-SUFFIX,snssdk.com,REJECT
-#   —— 抖音等字节系 App 的业务接口（aweme.snssdk.com）也在同一域名下，
-#      本插件主要是给「班级小管家」用的，没必要为了它误伤别的 App。
-#  同理不要碰：img|video|record|file|cosimg|disk|album.welife001.com、campusfile.welife001.com、
-#      tos*.banjixiaoguanjia.com（这些放的是用户的照片/语音/作业附件）。
+# 可莉改版后想复核这层依赖，跑：python3 tools/kelee-coverage.py <可莉新版BlockAdvertisers>
+#
+# 两个反例（别照抄网上的大杂烩规则集）：
+#   1) 不要写 DOMAIN-SUFFIX,snssdk.com,REJECT —— 抖音等字节系 App 的业务接口（aweme.snssdk.com）
+#      就在同一域名下。可莉自己的做法是用 AND 规则把「字节系 API 域名 + tnc」显式 DIRECT，
+#      要拦就学她那套，别整域墙。
+#   2) 不要碰用户数据 CDN —— img|video|record|file|cosimg|disk|album.welife001.com、
+#      campusfile.welife001.com、tos*.banjixiaoguanjia.com 放的是孩子的照片/语音/作业附件。
 ############################################################
 
 [Rewrite]
