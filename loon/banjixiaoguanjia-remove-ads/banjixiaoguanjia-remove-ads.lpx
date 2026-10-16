@@ -1,5 +1,5 @@
 #!name=班级小管家去广告
-#!desc=去掉「班级小管家」App 的开屏/插屏广告位与自建广告位。需配合可莉「广告平台拦截器」并置于其下方；仅对 App 生效，账号登录、作业、照片/语音等相关域名不做任何拦截。
+#!desc=去掉「班级小管家」App 的开屏/插屏广告位与自建广告位。\n\n需配合可莉「广告平台拦截器」并置于其下方；仅对 App 生效，账号登录、作业、照片/语音等相关域名不做任何拦截。
 #!author=chenpeng
 #!tag=去广告,教育
 #!openUrl=https://apps.apple.com/cn/app/id1524125516
@@ -14,55 +14,93 @@
 
 ############################################################
 # 班级小管家（com.banjixiaoguanjia.app / App Store id 1524125516）
-# 主域：service.banjixiaoguanjia.com（业务网关）
-# 静态资源：allsystemfile.welife001.com（配置 JSON、图片、字体、canvaskit）
+#   业务网关：service.banjixiaoguanjia.com（**故意不解密**，登录/作业都走它）
+#   静态资源：allsystemfile.welife001.com（配置 JSON、App 图片、字体、canvaskit）
+# 广告来源：① 三方 SDK（优量汇/穿山甲/…）开屏与插屏　② App 自建支付宝广告位（静态 JSON）
 ############################################################
 
 [Rule]
 ############################################################
-# 一、补漏：官方《第三方 SDK 目录》里列出、但可莉「广告平台拦截器」尚未覆盖的广告 SDK
+# 一、补漏：官方《第三方 SDK 目录》里列出、而可莉「广告平台拦截器」尚未覆盖的域名
+#    只写"可莉确实没盖"的，不重复堆规则——插件列表越长越容易互相打架
+#    解析结论均用 dig @223.5.5.5 实测于 2026-10-16
 ############################################################
-# 美数聚合（atdplus.cn 的 CNAME 指向 adx-svr.1rtb.com，是 RTB 广告交易域名）
+# ── 优量汇（腾讯广告 GDT）：开屏广告的位号 103544143 就走这里 ──
+# 可莉是"逐个子域"覆盖（只列了 c2./mi./t.gdt.qq.com 和 sdk.e.qq.com），
+# 而实测 win./v./sdk./c2./mi./t.gdt.qq.com 全都有解析，SUFFIX 一次盖住，堵掉漏网子域：
+#   gdt.qq.com 113.108.27.43 · win.gdt.qq.com 123.151.49.178 · v.gdt.qq.com 113.108.81.233
+#   sdk.gdt.qq.com 119.147.12.159 · c2.gdt.qq.com 113.108.81.206 · t.gdt.qq.com 113.108.27.27
+DOMAIN-SUFFIX,gdt.qq.com,REJECT
+# 优量汇素材 CDN（可莉只盖了 adsmind. / pgdt. 两个子域）
+DOMAIN-SUFFIX,ugdtimg.com,REJECT
+
+# ── 美数聚合（美数科技）──
 DOMAIN-SUFFIX,atdplus.cn,REJECT
 DOMAIN-SUFFIX,admate.cn,REJECT
-# AdScope
+
+# ── AdScope（轻变聚合）──
 DOMAIN-SUFFIX,ad-scope.com.cn,REJECT
-# 亿帆（主域无解析，子域 www.yfanads.cn 有解析，用 SUFFIX 一并覆盖）
+
+# ── 亿帆（主域无解析，但 www.yfanads.cn 有解析 14.103.234.158，SUFFIX 一并覆盖）──
 DOMAIN-SUFFIX,yfanads.cn,REJECT
-# 优推广告平台（同上，youtui./www.gameley.com 有解析）
+
+# ── 优推（主域无解析，但 youtui./www.gameley.com 有解析 81.70.205.221）──
 DOMAIN-SUFFIX,gameley.com,REJECT
-# 趣盟
+
+# ── 趣盟 ──
 DOMAIN-SUFFIX,qttunion.com,REJECT
 
-# 说明：优量汇(gdt.qq.com / pgdt.qq.com / ugdtimg.com)、穿山甲(*.pangolin* / *.snssdk.com)、
-# Funlink(adfunlink.com)、Octopus(sdk.zhangyuyidong.cn) 已由可莉「广告平台拦截器」覆盖，此处不重复。
-# 若抓包发现新的广告域名，直接追加在上方即可。
+############################################################
+# 以下平台已确认被可莉「广告平台拦截器」覆盖，此处不重复（改版时可莉若变更再补）：
+#   穿山甲：pangolin-sdk-toutiao*.com / pangolin.snssdk.com / panplayable-toutiao*.com /
+#           pglstatp-toutiao*.com，外加 api-access、log-api 关键字规则
+#   Funlink：adfunlink.com　　Octopus：sdk./sdklog.zhangyuyidong.cn
+#   美数聚合上游 RTB：1rtb.com / 1rtb.net　　优量汇 SDK 配置：sdk.e.qq.com
+#
+# 反例提醒（别照抄网上的规则）：不要写 DOMAIN-SUFFIX,snssdk.com,REJECT
+#   —— 抖音等字节系 App 的业务接口（aweme.snssdk.com）也在同一域名下，
+#      本插件主要是给「班级小管家」用的，没必要为了它误伤别的 App。
+#  同理不要碰：img|video|record|file|cosimg|disk|album.welife001.com、campusfile.welife001.com、
+#      tos*.banjixiaoguanjia.com（这些放的是用户的照片/语音/作业附件）。
+############################################################
 
 [Rewrite]
 ############################################################
-# 二、App 自建广告位（静态 JSON，无需登录，已实测可访问）
-#   data: [] 表示不下发任何自建广告位，客户端拿不到 posId 就不会展示
-#   对应：首页插屏(app_ad_home_chapin)、首页 Banner(app_ad_home_banner)、
-#        作业结束页 Banner(app_ad_post_end_banner)
+# 二、App 自建广告位（静态 JSON，无需登录，2026-10-16 实测仍在下发 3 条支付宝广告位）
+#   data: [] → 客户端拿不到 posId，广告位直接不渲染
+#   对应：首页 Banner(app_ad_home_banner)、首页插屏(app_ad_home_chapin)、
+#        作业结束页 Banner(app_ad_post_end_banner)，点击原本会跳支付宝小程序
 ############################################################
 ^https:\/\/allsystemfile\.welife001\.com\/app\/ads\/app_ads_config\.json response-body-json-replace data []
-# 若上面这行在你的 Loon 版本上不生效，可换成等价的 jq 写法（同一时间只保留一行）：
+# 若上面这行在个别 Loon 版本上不生效，可换成等价的 jq 写法（同一时间只保留一行）：
 # ^https:\/\/allsystemfile\.welife001\.com\/app\/ads\/app_ads_config\.json response-body-json-jq '.data=[]'
 
+# 广告图同样在这个站（/app/ads/imgs/img_ad_zfb_*.webp）。配置清空后客户端本就不该再拉，
+# 这里再兜一层：客户端即使吃了旧缓存，图片也拿不到，广告位只会是空的，不会闪烁出图。
+^https:\/\/allsystemfile\.welife001\.com\/app\/ads\/imgs\/ reject
+
 ############################################################
-# 三、兜底：这两个广告开关数组当前为空，但服务端随时可以塞内容
+# 三、兜底：这两个开关数组目前是空数组，但服务端随时可以塞内容
+#     app_config.json 里还挂着作业/打卡等大量业务配置，所以只精确清空这两个键，
+#     千万不要把整个 data 换掉
 ############################################################
 ^https:\/\/allsystemfile\.welife001\.com\/app\/config\/app_config\.json response-body-json-replace data.ads.submit_card_list [] data.ads.app_ad_home_icon []
 
-# 进阶（默认关闭，需要时把行首的 # 去掉）：
-# /app/getAdConfV2 是三方广告（优量汇等）的位配置下发接口，返回体形如 {"code":0,"msg":"","data":{...}}。
-# 它的 data 结构未做抓包验证，客户端还会把结果缓存到本地，所以默认不处理——只靠上面的域名拦截去开屏广告。
-# 如果你抓到了真实的响应 JSON，可以按下面两种方式处理：
+############################################################
+# 四、暂时不做的（需要你手机上的抓包数据才能做，做了才安全）
+#   /app/getAdConfV2：三方广告位配置下发接口（返回 code/msg/data 信封，data 结构未验证），
+#   清空它比只墙域名更彻底（客户端连 /launch_page 都不会跳，也不会有白屏等待）。
+#   但它走的是业务网关 service.banjixiaoguanjia.com，改写它就必须对该网关开 MitM =
+#   登录、作业、成绩等请求全部被解密，涉及未成年人数据，**默认坚决不开**。
+#   如果你确实想上，先只筛该域名抓一次 getAdConfV2 的真实响应，确认结构后再启用下面两行之一：
 # ^https:\/\/service\.banjixiaoguanjia\.com\/app\/getAdConfV2 response-body-json-replace data {}
 # ^https:\/\/service\.banjixiaoguanjia\.com\/app\/getAdConfV2 mock-response-body data-type=json data-path=bjxgjs_adconf.json status-code=200
+############################################################
 
 [MitM]
-# 只解密静态资源站，用于改写上面两个 JSON。
-# 注意：没有加 service.banjixiaoguanjia.com（业务网关），
-# 以免 App 的登录/作业等接口流量被解密，也避免遇到证书校验时整个 App 不可用。
+# 只解密这一个静态资源站，改写上面三个 JSON/图片规则用。
+# 实测结论（2026-10-16）：
+#   * 业务网关 service.banjixiaoguanjia.com 故意不加 —— 它承载登录、作业、成绩等请求
+#   * allsystemfile.banjixiaoguanjia.com 不用加 —— 那是另一个存储桶（火山 TOS），
+#     实测 /app/ads/app_ads_config.json 返回 NoSuchKey，广告配置只在下面这个域名上
 hostname=allsystemfile.welife001.com
